@@ -90,7 +90,7 @@ def organize_weekly_progress(progress_data):
 @app.route('/')
 def index():
 	print("Hello World")
-	return jsonify({'date': datetime.now(), 'msg': 'hello world'}), 200
+	return jsonify({'date': datetime.now(), 'msg': 'Updated the server side and client side'}), 200
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -255,9 +255,13 @@ def get_history():
 @app.route('/get_history_details/<id>', methods=['GET'])
 def get_history_details(id):
 	histDetail = db.child('session').child(id).get()
+	day = histDetail.val()['day'].lower()
+	df = pd.read_csv('./datasets/schedule.csv')
+	exercise = df[df['day'].str.lower() == day.lower()]['exercise'].values
 	to_send_list = []
 	if histDetail:
 		to_send_list.append(histDetail.val())
+		to_send_list[0]['name'] = exercise[0]
 		return jsonify({'data': to_send_list, 'status_code': 200}), 200
 	return jsonify({'msg': 'No data available', 'status_code': 204}), 204
 
@@ -363,5 +367,5 @@ def update_session_progress():
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
-	# app.run(host='0.0.0.0', port=port, debug=True)
-	app.run(host='11.28.81.123', port=port, debug=True)
+	app.run(host='0.0.0.0', port=port, debug=True)
+	# app.run(host='11.28.81.123', port=port, debug=True)
