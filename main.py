@@ -364,6 +364,26 @@ def update_session_progress():
 		if histData:
 			return jsonify({'msg': f'Data pushed for {req_date}', 'status_code': 200, 'key': histData['name']}), 200
 
+@app.route('/test_api', methods=['GET', 'POST'])
+def test_api():
+	print("# ---- test api ---- #")
+	if request.method == 'GET':
+		testData = db.child('test').get()
+		to_send_list = []
+		if testData:
+			to_send_list.append(testData.val())
+			return jsonify({'data': to_send_list, 'msg':'Got the data' ,'status_code': 200}), 200		
+		else:
+			return jsonify({'data': [], 'msg':'No data','status_code': 400}), 400
+	elif request.method == 'POST':
+		data = request.get_json()
+		to_send_list = [data]
+		testData = db.child('test').push(data)
+		if testData:
+			return jsonify({'key': testData['name'], 'msg': 'test data pushed', 'status_code': 200}), 200
+		else:
+			return jsonify({'key': '', 'msg': 'test data cannot be pushed', 'status_code': 417}), 417
+
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
