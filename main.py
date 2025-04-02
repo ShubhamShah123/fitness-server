@@ -87,10 +87,53 @@ def organize_weekly_progress(progress_data):
 	return formatted_weeks
 # --------------------- ROUTES ----------------------------
 
+####################### JUST SIMPLE ##########################
+
 @app.route('/')
 def index():
 	print("Hello World")
 	return jsonify({'date': datetime.now(), 'msg': 'Updated the server side and client side'}), 200
+
+
+####################### LOGIN ##########################
+@app.route('/login', methods=['POST'])
+def login():
+	print("# ---- login ---- #")
+	data = request.get_json()
+	email = data['email']
+	password = data['password']
+	m = hashlib.md5()
+	m.update(password.encode('utf-8'))
+	hashed_password = m.hexdigest()
+	to_send_list = []
+	usersData = db.child('users').get()
+	for user in usersData.each():
+		key = user.key()
+		if email == user.val()['email']:
+			if hashed_password == user.val()['password']:
+				return jsonify({'msg': 'Succesfully Logged in !', 'key': key, 'status_code': 200}), 200
+			else:
+				return jsonify({'msg': 'Password Incorrect', 'key': None, 'status_code': 401}), 401
+		
+	return jsonify({'msg': 'User not found', 'key': None, 'status_code': 404})	, 404
+
+####################### GET PROFILE ##########################
+@app.route('/get_profile', methods=['POST'])
+def get_profile():
+	print("# ---- get profile ---- #")
+	data = request.get_json()
+	userKey = data['key']
+	userData = db.child('users').child(userKey).get().val()
+	print(userData)
+	if userData:
+		to_send_list = [{
+			'email': userData['email'],
+			'name': f"{userData['firstName']} {userData['lastName']}",
+			'phone': userData['phoneNumber']
+		}]
+		return jsonify({'data': to_send_list, 'status_code': 200}), 200
+	else:
+		return jsonify({'data': ['Failed to get profile'], 'status_code': 400}), 400
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -124,41 +167,7 @@ def signup():
 		return jsonify({'msg': 'Error', 'key': None, 'status_code': 400}), 400
 
 
-"""
-	shahshubham845@gmail.com -> shubhamshah123
-	shubhamshah8397@gmail.com -> shubham123
-	admin@admin.com -> admin123
-	user@user.com -> user1234
-	client@client.com -> client12345
-"""
-@app.route('/login', methods=['POST'])
-def login():
-	print("---- login ----")
-	data = request.get_json()
-	email = data['email']
-	password = data['password']
-	m = hashlib.md5()
-	m.update(password.encode('utf-8'))
-	hashed_password = m.hexdigest()
-	to_send_list = []
-	usersData = db.child('users').get()
-	for user in usersData.each():
-		key = user.key()
-		if email == user.val()['email']:
-			if hashed_password == user.val()['password']:
-				flag = 1 if user.val()['role'] == 'admin' else 0
-				to_send_data = {
-					'firstName': user.val()['firstName'],
-					'lastName': user.val()['lastName'],
-					'email': user.val()['email'],
-					'phoneNumber': user.val()['phoneNumber']
-				}
-				to_send_list.append(to_send_data)
-				return jsonify({'msg': 'Succesfully Logged in !', 'key': key, 'status_code': 200, 'flag': flag, 'data': to_send_list}), 200
-			else:
-				return jsonify({'msg': 'Password Incorrect', 'key': None, 'status_code': 401}), 401
-		
-	return jsonify({'msg': 'User not found', 'key': None, 'status_code': 404})	, 404
+
 
 @app.route('/get_workout_schedule_v2', methods=['GET'])
 def get_workout_schedule_v2():
@@ -388,4 +397,4 @@ if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
 	app.run(host='0.0.0.0', port=port, debug=True)
-	# app.run(host='11.28.81.123', port=port, debug=True)
+	# app.run(host='11.28.80.162', port=port, debug=True)
