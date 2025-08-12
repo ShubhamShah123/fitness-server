@@ -34,7 +34,7 @@ def get_week_number(date_str):
 	week_num = ((day - 1) // 7) + 1
 	return date.isocalendar()[1]
 
-def organize_weekly_progress(progress_data):
+def organize_weekly_progress(progress_data, flag=None):
 	"""Organize progress data into weekly chunks"""
 	if not progress_data:
 		return []
@@ -54,86 +54,64 @@ def organize_weekly_progress(progress_data):
 		week_num = get_week_number(entry['date'])
 		weekly_data[week_num].append(entry)
 
-	
-	# Format the response
-	formatted_weeks = []
-	for week_num in sorted(weekly_data.keys()):
-		# print("Week Num: ", week_num)
-		week_entries = weekly_data[week_num]
-		week_start = min(week_entries, key=lambda x: datetime.strptime(x['date'], '%b %d, %Y'))['date']
-		week_end = max(week_entries, key=lambda x: datetime.strptime(x['date'], '%b %d, %Y'))['date']
-		weight_list = [float(e.get('weight')) for e in week_entries if e.get('weight')]
-		avg_weight = round(sum(weight_list) / len(weight_list), 2) if weight_list else 0.00
-		
-		week_data = {
-			'week_number': week_num,
-			'date_range': f"{week_start} to {week_end}",
-			'entries': week_entries,
-			'summary': {
-				'total_entries': len(week_entries),
-				'workouts_completed': sum(1 for e in week_entries if e.get('workout') == 'taken'),
-				'meals_taken': {
-					'breakfast': sum(1 for e in week_entries if e.get('breakfast') == 'taken'),
-					'lunch': sum(1 for e in week_entries if e.get('lunch') == 'taken'),
-					'dinner': sum(1 for e in week_entries if e.get('dinner') == 'taken'),
-					'snack': sum(1 for e in week_entries if e.get('snack') == 'taken')
-				},
-				'weight_readings': weight_list,
-				'average_weight': avg_weight
+	if not flag:
+		# Format the response
+		formatted_weeks = []
+		for week_num in sorted(weekly_data.keys()):
+			# print("Week Num: ", week_num)
+			week_entries = weekly_data[week_num]
+			week_start = min(week_entries, key=lambda x: datetime.strptime(x['date'], '%b %d, %Y'))['date']
+			week_end = max(week_entries, key=lambda x: datetime.strptime(x['date'], '%b %d, %Y'))['date']
+			weight_list = [float(e.get('weight')) for e in week_entries if e.get('weight')]
+			avg_weight = round(sum(weight_list) / len(weight_list), 2) if weight_list else 0.00
+			
+			week_data = {
+				'week_number': week_num,
+				'date_range': f"{week_start} to {week_end}",
+				'entries': week_entries,
+				'summary': {
+					'total_entries': len(week_entries),
+					'workouts_completed': sum(1 for e in week_entries if e.get('workout') == 'taken'),
+					'meals_taken': {
+						'breakfast': sum(1 for e in week_entries if e.get('breakfast') == 'taken'),
+						'lunch': sum(1 for e in week_entries if e.get('lunch') == 'taken'),
+						'dinner': sum(1 for e in week_entries if e.get('dinner') == 'taken'),
+						'snack': sum(1 for e in week_entries if e.get('snack') == 'taken')
+					},
+					'weight_readings': weight_list,
+					'average_weight': avg_weight
+				}
 			}
-		}
-		formatted_weeks.append(week_data)
-	
-	return formatted_weeks
+			formatted_weeks.append(week_data)
+		
+		return formatted_weeks
+	else:
+		# Format the response
+		formatted_weeks = []
+		for week_num in sorted(weekly_data.keys()):
+			# print("Week Num: ", week_num)
+			week_entries = weekly_data[week_num]
+			week_start = min(week_entries, key=lambda x: datetime.strptime(x['date'], '%b %d, %Y'))['date']
+			week_end = max(week_entries, key=lambda x: datetime.strptime(x['date'], '%b %d, %Y'))['date']
+			weight_list = [float(e.get('weight')) for e in week_entries if e.get('weight')]
+			avg_weight = round(sum(weight_list) / len(weight_list), 2) if weight_list else 0.00
+			
+			week_data = {
+				'week_number': week_num,
+				'date_range': f"{week_start} to {week_end}",
+				'weight_readings': weight_list,
+				'average_weight': avg_weight,
+				}
+			
+			formatted_weeks.append(week_data)
+		
+		return formatted_weeks
 # --------------------- ROUTES ----------------------------
-
-####################### JUST SIMPLE ##########################
 
 @app.route('/')
 def index():
 	print("Hello World")
-	return jsonify({'date': datetime.now(), 'msg': 'Updated the server side and client side'}), 200
-
-
-####################### LOGIN ##########################
-@app.route('/login', methods=['POST'])
-def login():
-	print("# ---- login ---- #")
-	data = request.get_json()
-	email = data['email']
-	password = data['password']
-	m = hashlib.md5()
-	m.update(password.encode('utf-8'))
-	hashed_password = m.hexdigest()
-	to_send_list = []
-	usersData = db.child('users').get()
-	for user in usersData.each():
-		key = user.key()
-		if email == user.val()['email']:
-			if hashed_password == user.val()['password']:
-				return jsonify({'msg': 'Succesfully Logged in !', 'key': key, 'status_code': 200}), 200
-			else:
-				return jsonify({'msg': 'Password Incorrect', 'key': None, 'status_code': 401}), 401
-		
-	return jsonify({'msg': 'User not found', 'key': None, 'status_code': 404})	, 404
-
-####################### GET PROFILE ##########################
-@app.route('/get_profile', methods=['POST'])
-def get_profile():
-	print("# ---- get profile ---- #")
-	data = request.get_json()
-	userKey = data['key']
-	userData = db.child('users').child(userKey).get().val()
-	print(userData)
-	if userData:
-		to_send_list = [{
-			'email': userData['email'],
-			'name': f"{userData['firstName']} {userData['lastName']}",
-			'phone': userData['phoneNumber']
-		}]
-		return jsonify({'data': to_send_list, 'status_code': 200}), 200
-	else:
-		return jsonify({'data': ['Failed to get profile'], 'status_code': 400}), 400
+	return jsonify({'date': datetime.now(), 'msg': 'hello world'}), 200
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -167,7 +145,41 @@ def signup():
 		return jsonify({'msg': 'Error', 'key': None, 'status_code': 400}), 400
 
 
-
+"""
+	shahshubham845@gmail.com -> shubhamshah123
+	shubhamshah8397@gmail.com -> shubham123
+	admin@admin.com -> admin123
+	user@user.com -> user1234
+	client@client.com -> client12345
+"""
+@app.route('/login', methods=['POST'])
+def login():
+	print("---- login ----")
+	data = request.get_json()
+	email = data['email']
+	password = data['password']
+	m = hashlib.md5()
+	m.update(password.encode('utf-8'))
+	hashed_password = m.hexdigest()
+	to_send_list = []
+	usersData = db.child('users').get()
+	for user in usersData.each():
+		key = user.key()
+		if email == user.val()['email']:
+			if hashed_password == user.val()['password']:
+				flag = 1 if user.val()['role'] == 'admin' else 0
+				to_send_data = {
+					'firstName': user.val()['firstName'],
+					'lastName': user.val()['lastName'],
+					'email': user.val()['email'],
+					'phoneNumber': user.val()['phoneNumber']
+				}
+				to_send_list.append(to_send_data)
+				return jsonify({'msg': 'Succesfully Logged in !', 'key': key, 'status_code': 200, 'flag': flag, 'data': to_send_list}), 200
+			else:
+				return jsonify({'msg': 'Password Incorrect', 'key': None, 'status_code': 401}), 401
+		
+	return jsonify({'msg': 'User not found', 'key': None, 'status_code': 404})	, 404
 
 @app.route('/get_workout_schedule_v2', methods=['GET'])
 def get_workout_schedule_v2():
@@ -264,13 +276,9 @@ def get_history():
 @app.route('/get_history_details/<id>', methods=['GET'])
 def get_history_details(id):
 	histDetail = db.child('session').child(id).get()
-	day = histDetail.val()['day'].lower()
-	df = pd.read_csv('./datasets/schedule.csv')
-	exercise = df[df['day'].str.lower() == day.lower()]['exercise'].values
 	to_send_list = []
 	if histDetail:
 		to_send_list.append(histDetail.val())
-		to_send_list[0]['name'] = exercise[0]
 		return jsonify({'data': to_send_list, 'status_code': 200}), 200
 	return jsonify({'msg': 'No data available', 'status_code': 204}), 204
 
@@ -373,28 +381,119 @@ def update_session_progress():
 		if histData:
 			return jsonify({'msg': f'Data pushed for {req_date}', 'status_code': 200, 'key': histData['name']}), 200
 
-@app.route('/test_api', methods=['GET', 'POST'])
-def test_api():
-	print("# ---- test api ---- #")
-	if request.method == 'GET':
-		testData = db.child('test').get()
-		to_send_list = []
-		if testData:
-			to_send_list.append(testData.val())
-			return jsonify({'data': to_send_list, 'msg':'Got the data' ,'status_code': 200}), 200		
-		else:
-			return jsonify({'data': [], 'msg':'No data','status_code': 400}), 400
-	elif request.method == 'POST':
-		data = request.get_json()
-		to_send_list = [data]
-		testData = db.child('test').push(data)
-		if testData:
-			return jsonify({'key': testData['name'], 'msg': 'test data pushed', 'status_code': 200}), 200
-		else:
-			return jsonify({'key': '', 'msg': 'test data cannot be pushed', 'status_code': 417}), 417
+@app.route('/get_recent_workouts', methods=['GET'])
+def get_recent_workouts():
+	to_send_list=[]
+	recent_workouts = db.child('session').order_by_key().limit_to_last(7).get()
+	
+	for workout in recent_workouts.each():
+		data = workout.val()
+		filtered = {
+			'date': data['date'],
+			'day': data['day'],
+			'sessionTime': data['sessionTime'],
+			'name':'name' # Add the name later on. Need to send the name of exercise as well.
+		}
+		to_send_list.append(filtered)
+	return jsonify({'msg': 'Recent Workouts List.', 'status_code': 200, 'data': to_send_list}), 200
+
+@app.route('/get_weights', methods=['GET'])
+def get_weights():
+	print("--- get weights ---")
+	try:
+		weights_df = db.child('history').get()
+		monthly_data = defaultdict(list)
+
+		for w in weights_df.each():
+			data = w.val()
+			date_str = data.get('date', '')
+			weight_str = data.get('weight', '')
+			print(f"Date: {date_str}")
+			print(f"Weight: {weight_str}")
+			print("----------------")
+			# Skip if weight is empty
+			if not weight_str:
+				continue
+
+			try:
+				# Parse the date (e.g., "Feb 03, 2025")
+				dt = datetime.strptime(date_str, "%b %d, %Y")
+				month_key = dt.strftime("%Y-%m")  # "2025-02"
+
+				# Convert weight to float
+				weight = float(weight_str)
+
+				# Group by month
+				monthly_data[month_key].append(weight)
+			except Exception as e:
+				print(f"Skipping invalid entry: {data} | Error: {e}")
+
+		# Compute average weights
+		monthly_avg = []
+		for month, weights in monthly_data.items():
+			avg = round(sum(weights) / len(weights), 2)
+			monthly_avg.append({
+				"month": month,
+				"averageWeight": avg
+			})
+
+		# Optional: sort by month
+		monthly_avg.sort(key=lambda x: x["month"])
+		print("[+] Organizign the data to weekly...")
+		weekly_df = organize_weekly_progress(weights_df,flag=1)
+		print(weekly_df)
+		
+		return jsonify({
+			'status': 'success',
+			'monthly': monthly_avg,
+			'weekly':weekly_df
+		}), 200
+
+	except Exception as e:
+		return jsonify({
+			'status': 'error',
+			'message': str(e)
+		}), 500
+
+@app.route('/get_workout_day',methods=['GET'])
+def get_workout_day():
+	date = datetime.today().strftime("%A")
+	df =  pd.read_csv('./datasets/schedule.csv')
+	exercise_name = df[df['day'] == date]['exercise'].values[0]
+	df = pd.read_csv(f'./datasets/{date.lower()}.csv')
+	print(df['exercise'].to_list())
+	to_send_dict = {
+		'name':exercise_name,
+		'exercise_list':df['exercise'].to_list()
+	}
+	return jsonify({'status_code':200,'data':to_send_dict}), 200
+
+@app.route('/update_exercise/<id>',methods=['PATCH'])
+def update_exercise(id):
+	data = request.get_json()
+	print("----- updating exercise -----")
+	print("Data: ", data)
+	file_name = data['day'].lower()
+	df = pd.read_csv(f'./datasets/{file_name}.csv')
+	print(df)
+	# Update the row where id matches
+	df.loc[df['id'] == data['id'], ['exercise', 'sets', 'reps', 'desc']] = [
+		data['name'],
+		data['sets'],
+		data['reps'],
+		data['desc']
+	]
+	df.to_csv(f'./datasets/{file_name}.csv', index=False)
+	return jsonify({'status': 'Data successfully Updated!', 'status_code': 200}), 200
+
+"""
+TODO: 
+Add the file to github. Vercel will automatically take it.
+Add a single exercise.
+"""
 
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
 	app.run(host='0.0.0.0', port=port, debug=True)
-	# app.run(host='11.28.80.162', port=port, debug=True)
+	# app.run(host='192.168.68.57', port=port, debug=True)
