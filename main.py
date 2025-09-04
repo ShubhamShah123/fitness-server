@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
 from collections import defaultdict
-from meals import MealsData
+# from meals import MealsData
 import os
 import pyrebase
 import hashlib
@@ -116,68 +116,68 @@ def index():
 	return jsonify({'date': datetime.now(), 'msg': 'hello world'}), 200
 
 # Firestore data adding.
-@app.route('/add_data')
-def add_data():
-	data = pd.read_csv('./datasets/schedule.csv')
-	print(data)
-	print("Dict:")
-	data['day'] = data['day'].str.lower()
-	to_add_data = data.set_index('day').to_dict(orient='index')
-	for day in to_add_data:
-		to_add_data[day]['exercise_key'] = ''
-	res = db.child('dataset').child('schedule').set(to_add_data)
-	if res:
-		return jsonify({'status':'data added'}), 200
-	else:
-		return jsonify({'status': 'Some error happened pushing data.'}), 400
+# @app.route('/add_data')
+# def add_data():
+# 	data = pd.read_csv('./datasets/schedule.csv')
+# 	print(data)
+# 	print("Dict:")
+# 	data['day'] = data['day'].str.lower()
+# 	to_add_data = data.set_index('day').to_dict(orient='index')
+# 	for day in to_add_data:
+# 		to_add_data[day]['exercise_key'] = ''
+# 	res = db.child('dataset').child('schedule').set(to_add_data)
+# 	if res:
+# 		return jsonify({'status':'data added'}), 200
+# 	else:
+# 		return jsonify({'status': 'Some error happened pushing data.'}), 400
 
-@app.route('/add_exercise')
-def add_exercise():
-	print("---- adding exercise ----")
-	# days = ['monday','tuesday','wednesday','thursday','friday','saturday']
-	days = ['wednesday']
-	for day in days:
-		df = pd.read_csv(f'./datasets/{day}.csv', dtype={'id': str})
-		print(f"[+] Reading {day}.csv ...")
-		df['id'] = df['id'].astype(str)
-		to_add_data = df.set_index('id').to_dict(orient='index')
-		print(to_add_data)
+# @app.route('/add_exercise')
+# def add_exercise():
+# 	print("---- adding exercise ----")
+# 	# days = ['monday','tuesday','wednesday','thursday','friday','saturday']
+# 	days = ['wednesday']
+# 	for day in days:
+# 		df = pd.read_csv(f'./datasets/{day}.csv', dtype={'id': str})
+# 		print(f"[+] Reading {day}.csv ...")
+# 		df['id'] = df['id'].astype(str)
+# 		to_add_data = df.set_index('id').to_dict(orient='index')
+# 		print(to_add_data)
 
-		# Replace NaN with None and make sure everything is JSON serializable
-		for outer_k, inner_dict in to_add_data.items():
-			for inner_k, v in inner_dict.items():
-				if pd.isna(v):  # catches np.nan, None, NaT
-					inner_dict[inner_k] = None
-		json.dumps(to_add_data)
-		res = db.child('dataset').child('exercise').push(to_add_data)
-		sch = db.child('dataset').child('schedule').child(day).update({'exercise_key': res['name']})
-	return jsonify({"status": "data added and key updated."}), 200
+# 		# Replace NaN with None and make sure everything is JSON serializable
+# 		for outer_k, inner_dict in to_add_data.items():
+# 			for inner_k, v in inner_dict.items():
+# 				if pd.isna(v):  # catches np.nan, None, NaT
+# 					inner_dict[inner_k] = None
+# 		json.dumps(to_add_data)
+# 		res = db.child('dataset').child('exercise').push(to_add_data)
+# 		sch = db.child('dataset').child('schedule').child(day).update({'exercise_key': res['name']})
+# 	return jsonify({"status": "data added and key updated."}), 200
 
-@app.route('/add_meals')
-def add_meals():
-	print("--- adding meals ---")
+# @app.route('/add_meals')
+# def add_meals():
+# 	print("--- adding meals ---")
 	
-	for meal in MealsData:
-		meal_id = meal['id']
+# 	for meal in MealsData:
+# 		meal_id = meal['id']
 
-		# First store the main meal data (day & type)
-		db.child('dataset').child('meals').child(str(meal_id)).set({
-			'day': meal['day'],
-			'type': meal['type']
-		})
+# 		# First store the main meal data (day & type)
+# 		db.child('dataset').child('meals').child(str(meal_id)).set({
+# 			'day': meal['day'],
+# 			'type': meal['type']
+# 		})
 
-		# Then store each detail item as its own node
-		for detail in meal['details']:
-			meal_num = detail['meal_num']
+# 		# Then store each detail item as its own node
+# 		for detail in meal['details']:
+# 			meal_num = detail['meal_num']
 
-			# Store detail under "details/{meal_num}"
-			db.child('dataset').child('meals').child(str(meal_id)).child('details').child(meal_num).set({
-				'meal_type': detail['meal_type'],
-				'meal_name': detail['meal_name'],
-				'recipe': detail['recipe']
-			})
+# 			# Store detail under "details/{meal_num}"
+# 			db.child('dataset').child('meals').child(str(meal_id)).child('details').child(meal_num).set({
+# 				'meal_type': detail['meal_type'],
+# 				'meal_name': detail['meal_name'],
+# 				'recipe': detail['recipe']
+# 			})
 
-	return jsonify({'status': 'Meals and details added to DB'}), 200
+# 	return jsonify({'status': 'Meals and details added to DB'}), 200
 
 @app.route('/get_meals_schedule', methods=['GET'])
 def get_meals_schedule():
