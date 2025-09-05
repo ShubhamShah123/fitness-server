@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, date
 from collections import defaultdict
 # from meals import MealsData
 import os
@@ -8,7 +8,6 @@ import pyrebase
 import hashlib
 import pandas as pd
 import numpy as np
-import json
 
 app = Flask(__name__)
 CORS(app)
@@ -114,70 +113,6 @@ def organize_weekly_progress(progress_data, flag=None):
 def index():
 	print("Hello World")
 	return jsonify({'date': datetime.now(), 'msg': 'hello world'}), 200
-
-# Firestore data adding.
-# @app.route('/add_data')
-# def add_data():
-# 	data = pd.read_csv('./datasets/schedule.csv')
-# 	print(data)
-# 	print("Dict:")
-# 	data['day'] = data['day'].str.lower()
-# 	to_add_data = data.set_index('day').to_dict(orient='index')
-# 	for day in to_add_data:
-# 		to_add_data[day]['exercise_key'] = ''
-# 	res = db.child('dataset').child('schedule').set(to_add_data)
-# 	if res:
-# 		return jsonify({'status':'data added'}), 200
-# 	else:
-# 		return jsonify({'status': 'Some error happened pushing data.'}), 400
-
-# @app.route('/add_exercise')
-# def add_exercise():
-# 	print("---- adding exercise ----")
-# 	# days = ['monday','tuesday','wednesday','thursday','friday','saturday']
-# 	days = ['wednesday']
-# 	for day in days:
-# 		df = pd.read_csv(f'./datasets/{day}.csv', dtype={'id': str})
-# 		print(f"[+] Reading {day}.csv ...")
-# 		df['id'] = df['id'].astype(str)
-# 		to_add_data = df.set_index('id').to_dict(orient='index')
-# 		print(to_add_data)
-
-# 		# Replace NaN with None and make sure everything is JSON serializable
-# 		for outer_k, inner_dict in to_add_data.items():
-# 			for inner_k, v in inner_dict.items():
-# 				if pd.isna(v):  # catches np.nan, None, NaT
-# 					inner_dict[inner_k] = None
-# 		json.dumps(to_add_data)
-# 		res = db.child('dataset').child('exercise').push(to_add_data)
-# 		sch = db.child('dataset').child('schedule').child(day).update({'exercise_key': res['name']})
-# 	return jsonify({"status": "data added and key updated."}), 200
-
-# @app.route('/add_meals')
-# def add_meals():
-# 	print("--- adding meals ---")
-	
-# 	for meal in MealsData:
-# 		meal_id = meal['id']
-
-# 		# First store the main meal data (day & type)
-# 		db.child('dataset').child('meals').child(str(meal_id)).set({
-# 			'day': meal['day'],
-# 			'type': meal['type']
-# 		})
-
-# 		# Then store each detail item as its own node
-# 		for detail in meal['details']:
-# 			meal_num = detail['meal_num']
-
-# 			# Store detail under "details/{meal_num}"
-# 			db.child('dataset').child('meals').child(str(meal_id)).child('details').child(meal_num).set({
-# 				'meal_type': detail['meal_type'],
-# 				'meal_name': detail['meal_name'],
-# 				'recipe': detail['recipe']
-# 			})
-
-# 	return jsonify({'status': 'Meals and details added to DB'}), 200
 
 @app.route('/get_meals_schedule', methods=['GET'])
 def get_meals_schedule():
@@ -371,8 +306,8 @@ def upload_session():
 	print("--- upload session ---")
 	data = request.get_json()
 	print("Data from the client:\n",data)
-	# return jsonify({'status':'still working'}), 200
 	date_str = data['date'] # This goes to session
+	# return jsonify({'status':'still working'}), 200
 	date_obj = datetime.strptime(date_str, "%Y-%m-%d")
 	formatted_date = date_obj.strftime("%b %d, %Y") # This goes to History
 	sessTime = data['sessionTime']
@@ -389,10 +324,15 @@ def upload_session():
 		print("exercise key: ",exKey)
 		nameData = db.child('dataset').child('schedule').get().val()
 		
-		exercise_name = next((day_info['exercise'] for day_info in nameData.values() if day_info['exercise_key'] == exKey),None)
-		print(f"Exercise Name: {exercise_name}| Key: {exKey}")
-		data['day'] = exercise_name
-		# return jsonify({'status':'still working'}), 200
+		day_of_week = next((day for day, day_info in nameData.items() if day_info['exercise_key'] == exKey), None)
+		print(f"Exercise Day: {day_of_week}| Key: {exKey}")
+		data['day'] = day_of_week
+		prevData = db.child('session').order_by_key().limit_to_last(1).get().val()
+		prev_date = [val['date'] for _, val in prevData.items()][0]
+		date_str = data['date'] # This goes to session
+		print(f"Current: {date_str}, {type(date_str)} | Prev: {prev_date}, {type(prev_date)}")
+		date_diff = date.fromisoformat(date_str) - date.fromisoformat(prev_date)
+		print(f"Date Difference: {date_diff.days}")
 		sessData = db.child('session').push(data)
 		if sessData:
 			sessionKey = sessData['name']
@@ -415,7 +355,12 @@ def upload_session():
 			if histDataResp:
 				cnt = db.child('streak').get().val()
 				print("Streak: ",cnt)
-				return jsonify({'msg': 'Data added to sesssion & streak updated.', 'status_code': 200, 'key': histDataResp['name']}), 200
+				if date_diff.days == 1:
+					new_streak = int(cnt) + 1
+					db.child('streak').set(new_streak)
+				else:
+					db.child('streak').set(0)
+				return jsonify({'msg': 'Data added to sesssion & streak updated.', 'status_code': 200, 'key': histDataResp['name'], 'new_streak': str(new_streak)}), 200
 			else:
 				return jsonify({'msg': 'Failed to add History data.', 'status_code': 400, 'key': None}), 400
 		else:
@@ -721,7 +666,7 @@ def get_daily_workout_report():
 	exData = db.child('dataset').child('schedule').child(sessData.get('day', '').lower()).get()
 	# Extract session data (excluding date)
 	session_data = {
-		'day': sessData.get('day', ''),
+		'day': sessData.get('day', '').capitalize(),
 		'name': exData.val()['exercise'],
 		'exercise': sessData.get('exercise', {}),
 		'sessionTime': sessData.get('sessionTime', ''),
