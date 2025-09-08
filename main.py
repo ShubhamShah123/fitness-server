@@ -341,7 +341,7 @@ def upload_session():
 				"date": formatted_date, 
 				"dinner": 'missed',
 				"hip": '',
-				"lunch": '',
+				"lunch": 'missed',
 				"preWorkout": 'missed',
 				"sessionId": sessionKey,
 				"snack": 'missed',
@@ -355,6 +355,7 @@ def upload_session():
 			if histDataResp:
 				cnt = db.child('streak').get().val()
 				print("Streak: ",cnt)
+				new_streak = 0
 				if date_diff.days == 1:
 					new_streak = int(cnt) + 1
 					db.child('streak').set(new_streak)
