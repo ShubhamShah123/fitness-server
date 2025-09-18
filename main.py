@@ -689,5 +689,5 @@ def get_daily_workout_report():
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
-	# app.run(host='0.0.0.0', port=port, debug=True)
-	app.run(host='10.215.123.36', port=port, debug=True)
+	app.run(host='0.0.0.0', port=port, debug=True)
+	# app.run(host='10.215.123.36', port=port, debug=True)
