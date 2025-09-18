@@ -307,6 +307,14 @@ def upload_session():
 	data = request.get_json()
 	print("Data from the client:\n",data)
 	date_str = data['date'] # This goes to session
+	print(f"Date string:{date_str}")
+	exKey = data['day']
+	print("exercise key: ",exKey)
+	nameData = db.child('dataset').child('schedule').get().val()
+	
+	day_of_week = next((day for day, day_info in nameData.items() if day_info['exercise_key'] == exKey), None)
+	print(f"Exercise Day: {day_of_week}| Key: {exKey}")
+	data['day'] = day_of_week
 	# return jsonify({'status':'still working'}), 200
 	date_obj = datetime.strptime(date_str, "%Y-%m-%d")
 	formatted_date = date_obj.strftime("%b %d, %Y") # This goes to History
@@ -316,17 +324,12 @@ def upload_session():
 		if sessData:
 			req_date_data = db.child('history').order_by_child('date').equal_to(formatted_date).get()
 			for req in req_date_data.each():
+				print(f"Key: {req.key()}")
 				db.child('history').child(req.key()).update({'sessionId': sessData['name']})
 			return jsonify({'msg': 'Updated the session key!', 'status_code': 200}), 200
 
 	elif sessTime.lower() == 'morning':
-		exKey = data['day']
-		print("exercise key: ",exKey)
-		nameData = db.child('dataset').child('schedule').get().val()
 		
-		day_of_week = next((day for day, day_info in nameData.items() if day_info['exercise_key'] == exKey), None)
-		print(f"Exercise Day: {day_of_week}| Key: {exKey}")
-		data['day'] = day_of_week
 		prevData = db.child('session').order_by_key().limit_to_last(1).get().val()
 		prev_date = [val['date'] for _, val in prevData.items()][0]
 		date_str = data['date'] # This goes to session
@@ -399,26 +402,26 @@ def get_session_progress():
 
 @app.route('/update_session_progress', methods=['PUT'])
 def update_session_progress():
+	print("---- update sesssion progress ---")
 	data = request.get_json()
+	print("data from client: ",data)
 	req_date = data['date']
+	print("\nReq Date: ", req_date)
 	sessData = db.child('history').order_by_child('date').equal_to(req_date).get()
+	print(sessData.val())
 	if sessData.val():
-		sVal = None
+		print("Pushing to already available data!")
 		sKey = None
 		for sItem in sessData.each():
-			sVal = sItem.val()
 			sKey = sItem.key()
-
-		to_send_data = {}
-		for key in sVal.keys():
-			to_send_data[key] = data[key]
-
-		result = db.child('history').child(sKey).update(to_send_data)
+		result = db.child('history').child(sKey).update(data)
 		if result:
 			return jsonify({'msg': 'Updated Successfully', 'status_code': 200}), 200
 		else:
 			return jsonify({'msg': 'Updation Failed', 'status_code': 500}), 500
 	else:
+		print("Pushing to new data")
+		print(data)
 		histData = db.child('history').push(data)
 		if histData:
 			return jsonify({'msg': f'Data pushed for {req_date}', 'status_code': 200, 'key': histData['name']}), 200
@@ -682,13 +685,9 @@ def get_daily_workout_report():
 	}
 	
 	return jsonify({'status':'Completed!','data':response_data}), 200
-'''
-TODO: 
-Checkout the upload session part. The exercise is undefined and the key of the exercise is going in name.
-'''
 
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
-	app.run(host='0.0.0.0', port=port, debug=True)
-	# app.run(host='10.236.36.36', port=port, debug=True)
+	# app.run(host='0.0.0.0', port=port, debug=True)
+	app.run(host='10.215.123.36', port=port, debug=True)
