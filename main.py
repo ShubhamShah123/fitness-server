@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime, date
 from collections import defaultdict
-# from meals import MealsData
+
 import os
 import pyrebase
 import hashlib
@@ -29,7 +29,6 @@ db = firebase.database()
 # --------------------- FUNCTIONS ----------------------------
 
 def get_week_number(date_str):
-	"""Convert date string to week number relative to the first date in dataset"""
 	date = datetime.strptime(date_str, '%b %d, %Y')
 	day = date.day
 	week_num = ((day - 1) // 7) + 1
@@ -135,9 +134,7 @@ def get_meals_schedule():
 def get_meal_data(id):
 	print(f"--- Getting Meals data for ID: {id} | {type(id)}---")
 	meal_data = db.child('dataset').child('meals').child(id).get().val()
-	print(meal_data)
 	meal_data['details'][:] = [d for d in meal_data['details'] if d is not None]
-	print(meal_data)
 	return jsonify({'status':'Got the data!','data':meal_data}), 200
 #----------------------------------------------------------
 
@@ -233,11 +230,9 @@ def get_workout_schedule_v2():
 @app.route('/get_workout_details_v2/<id>', methods=['GET'])
 def get_workout_details_v2(id):
 	print("# ---- get_workout_details_v2 ----")
-	print("Request from client: ", id)
-
 	exercise_data = db.child('dataset').child('exercise').child(id).get().val()
-	print("Raw data from DB:", exercise_data)
-
+	schData = db.child('dataset').child('schedule').get().val()
+	exDay = next((k for k, v in schData.items() if v["exercise_key"] == id), None)
 	sending_list = []
 	if exercise_data:   # ✅ only loop if data exists
 		for key in exercise_data:
@@ -253,6 +248,7 @@ def get_workout_details_v2(id):
 		print("⚠️ No data found for:", id)
 
 	return jsonify({
+		'day':exDay,
 		'status': 'Working',
 		'data': sending_list   # will be [] if no exercises (like Sunday)
 	})
@@ -305,17 +301,11 @@ def get_history_details(id):
 def upload_session():
 	print("--- upload session ---")
 	data = request.get_json()
-	print("Data from the client:\n",data)
 	date_str = data['date'] # This goes to session
-	print(f"Date string:{date_str}")
 	exKey = data['day']
-	print("exercise key: ",exKey)
 	nameData = db.child('dataset').child('schedule').get().val()
-	
 	day_of_week = next((day for day, day_info in nameData.items() if day_info['exercise_key'] == exKey), None)
-	print(f"Exercise Day: {day_of_week}| Key: {exKey}")
 	data['day'] = day_of_week
-	# return jsonify({'status':'still working'}), 200
 	date_obj = datetime.strptime(date_str, "%Y-%m-%d")
 	formatted_date = date_obj.strftime("%b %d, %Y") # This goes to History
 	sessTime = data['sessionTime']
@@ -324,18 +314,14 @@ def upload_session():
 		if sessData:
 			req_date_data = db.child('history').order_by_child('date').equal_to(formatted_date).get()
 			for req in req_date_data.each():
-				print(f"Key: {req.key()}")
 				db.child('history').child(req.key()).update({'sessionId': sessData['name']})
 			return jsonify({'msg': 'Updated the session key!', 'status_code': 200}), 200
 
 	elif sessTime.lower() == 'morning':
-		
 		prevData = db.child('session').order_by_key().limit_to_last(1).get().val()
 		prev_date = [val['date'] for _, val in prevData.items()][0]
 		date_str = data['date'] # This goes to session
-		print(f"Current: {date_str}, {type(date_str)} | Prev: {prev_date}, {type(prev_date)}")
 		date_diff = date.fromisoformat(date_str) - date.fromisoformat(prev_date)
-		print(f"Date Difference: {date_diff.days}")
 		sessData = db.child('session').push(data)
 		if sessData:
 			sessionKey = sessData['name']
@@ -357,7 +343,6 @@ def upload_session():
 			histDataResp = db.child('history').push(histData)
 			if histDataResp:
 				cnt = db.child('streak').get().val()
-				print("Streak: ",cnt)
 				new_streak = 0
 				if date_diff.days == 1:
 					new_streak = int(cnt) + 1
@@ -404,13 +389,10 @@ def get_session_progress():
 def update_session_progress():
 	print("---- update sesssion progress ---")
 	data = request.get_json()
-	print("data from client: ",data)
 	req_date = data['date']
-	print("\nReq Date: ", req_date)
 	sessData = db.child('history').order_by_child('date').equal_to(req_date).get()
 	print(sessData.val())
 	if sessData.val():
-		print("Pushing to already available data!")
 		sKey = None
 		for sItem in sessData.each():
 			sKey = sItem.key()
@@ -420,8 +402,6 @@ def update_session_progress():
 		else:
 			return jsonify({'msg': 'Updation Failed', 'status_code': 500}), 500
 	else:
-		print("Pushing to new data")
-		print(data)
 		histData = db.child('history').push(data)
 		if histData:
 			return jsonify({'msg': f'Data pushed for {req_date}', 'status_code': 200, 'key': histData['name']}), 200
@@ -429,15 +409,16 @@ def update_session_progress():
 @app.route('/get_recent_workouts', methods=['GET'])
 def get_recent_workouts():
 	to_send_list=[]
+	print("---- get recent workouts ----")
 	recent_workouts = db.child('session').order_by_key().limit_to_last(7).get()
-	
 	for workout in recent_workouts.each():
 		data = workout.val()
+		exName = db.child('dataset').child('schedule').child(data['day']).get().val()
 		filtered = {
 			'date': data['date'],
-			'day': data['day'],
-			'sessionTime': data['sessionTime'],
-			'name':'name' # Add the name later on. Need to send the name of exercise as well.
+			'day': data['day'].capitalize(),
+			'sessionTime': data['sessionTime'].capitalize(),
+			'name':exName['exercise'] # Add the name later on. Need to send the name of exercise as well.
 		}
 		to_send_list.append(filtered)
 	return jsonify({'msg': 'Recent Workouts List.', 'status_code': 200, 'data': to_send_list}), 200
@@ -453,9 +434,6 @@ def get_weights():
 			data = w.val()
 			date_str = data.get('date', '')
 			weight_str = data.get('weight', '')
-			print(f"Date: {date_str}")
-			print(f"Weight: {weight_str}")
-			print("----------------")
 			# Skip if weight is empty
 			if not weight_str:
 				continue
@@ -484,9 +462,8 @@ def get_weights():
 
 		# Optional: sort by month
 		monthly_avg.sort(key=lambda x: x["month"])
-		print("[+] Organizign the data to weekly...")
 		weekly_df = organize_weekly_progress(weights_df,flag=1)
-		print(weekly_df)
+		# print(weekly_df)
 		
 		return jsonify({
 			'status': 'success',
@@ -509,7 +486,6 @@ def get_workout_day():
 	exercise_name = sch_df.val()[date.lower()]['exercise']
 	exercise_key = sch_df.val()[date.lower()]['exercise_key']
 	exercise_data = db.child('dataset').child('exercise').child(exercise_key).get().val()
-	print("exercise data\n",exercise_data)
 	to_send_dict = {
 		'name':exercise_name,
 		'exercise_list':list(exercise_data.values())[1:]
@@ -520,7 +496,6 @@ def get_workout_day():
 def update_exercise(id):
 	data = request.get_json()
 	print("----- updating exercise -----")
-	print("Data: ", data)
 	to_update_date = {
 		'desc':data['desc'],
 		'sets':data['sets'],
@@ -538,17 +513,13 @@ def update_exercise(id):
 @app.route('/add_new_exercise/<id>', methods=['POST'])
 def add_new_exercise(id):
 	print("--- Adding new Exercise ---")
-	print("Request ID: ", id)
 	data = request.get_json()
-	print(f"Data from the client:\n{data}")
 	exId = data['id']
 	exData = {k: v for k, v in data.items() if k != "id"}
 	newEx = db.child('dataset').child('exercise').child(id).child(exId).set(exData)
 	if newEx:
-		print(f"Data successfully added! {newEx}")
 		return jsonify({'status': 'Data added succesfully', 'key':exId}), 200
 	else:
-		print(f"Data addition failed!")
 		return jsonify({'status': 'Data addition failed.', 'key':None}), 400
 	
 
@@ -556,7 +527,6 @@ def add_new_exercise(id):
 def get_streak_counter():
 	print("--- get streak counter ---")
 	cnt = db.child('streak').get().val()
-	print("Streak: ",cnt, type(cnt))
 	return jsonify({'status': 'Still working', 'counter':str(cnt)}),200
 
 @app.route('/get_profile', methods=['POST'])
@@ -564,9 +534,7 @@ def get_profile():
 	print("--- Getting Profile ---")
 	data = request.get_json()
 	userKey = data['key']
-	print("UserKey from the client: ", userKey)
 	userProfile = db.child('users').child(userKey).get().val()
-	print(userProfile)
 	to_send_dict = {
 		'firstName': userProfile['firstName'],
 		'lastName': userProfile['lastName'],
@@ -647,11 +615,9 @@ def get_daily_workout_report():
 	data = request.get_json()
 	hKey = data['histKey']
 	sKey = data['sessKey']
-	print(f"history: {hKey} | session: {sKey}")
 	
 	histData = db.child('history').child(hKey).get().val()
 	sessData = db.child('session').child(sKey).get().val()
-	print(f"---- HISTORY ----\n{histData}\n---- SESSION ----\n{sessData}")
 	
 	# Extract meals data from history (excluding sessionId and date)
 	meals_data = {
@@ -686,8 +652,14 @@ def get_daily_workout_report():
 	
 	return jsonify({'status':'Completed!','data':response_data}), 200
 
+@app.route('/delete_sched_workout', methods=['DELETE'])
+def delete_sched_workout():
+	print("--- delete_sched_workout ---")
+	data = request.get_json()
+	db.child('dataset').child('exercise').child(data['sId']).child(data['exId']).remove()
+	return jsonify({'status': 'Successfully Deleted!','status_code': 200}), 200
+
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
-	# CHANGE THIS TO 0.0.0.0 WHILE PUBLISHING ON HEROKU
 	app.run(host='0.0.0.0', port=port, debug=True)
-	# app.run(host='10.215.123.36', port=port, debug=True)
+	# app.run(host='11.42.12.113', port=port, debug=True)
