@@ -659,6 +659,29 @@ def delete_sched_workout():
 	db.child('dataset').child('exercise').child(data['sId']).child(data['exId']).remove()
 	return jsonify({'status': 'Successfully Deleted!','status_code': 200}), 200
 
+@app.route('/get_exercise_list', methods=['GET'])
+def get_exercise_list():
+	print("--- get_exercise_list ---")
+	to_send_list = []
+	sched = db.child('dataset').child('schedule').get().val()
+	for key, val in sched.items():
+		tempList = []
+		exData = db.child('dataset').child('exercise').child(val.get('exercise_key', None)).get().val()
+		if exData:
+			for exKey, exVal in exData.items():
+				tempList.append({
+					'name': exVal.get('exercise',None),
+					'gif': exVal.get('gif',None),
+				})
+
+		to_send_dict = {
+			'exerciseName': val.get('exercise', ''),
+			'exerciseList': [] if key == 'sunday' else tempList
+		}
+		to_send_list.append(to_send_dict)
+	formatted_list = format_exercises(to_send_list)
+	return jsonify({'data': formatted_list}), 200
+
 if __name__ == '__main__':
 	port = int(os.environ.get('PORT', 8080))
 	app.run(host='0.0.0.0', port=port, debug=True)
