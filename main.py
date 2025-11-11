@@ -27,7 +27,53 @@ firebase = pyrebase.initialize_app(firebaseConfig)
 db = firebase.database()
 
 # --------------------- FUNCTIONS ----------------------------
+def format_exercises(to_send_list):
+    # Helper function to normalize group names (remove extras like ABS, Cardio, Light/Heavy)
+    def normalize_group_name(name):
+        name = name.lower()
+        name = re.sub(r'\s*\+\s*abs.*', '', name)
+        name = re.sub(r'\s*\+\s*cardio.*', '', name)
+        name = re.sub(r'\(.*?\)', '', name)
+        return name.strip().title()
 
+    # Helper function to check if an exercise is ABS or Cardio
+    def is_abs(name):
+        return 'abs' in name.lower()
+
+    def is_cardio(name):
+        return 'cardio' in name.lower()
+
+    # Result containers
+    grouped_exercises = defaultdict(set)
+    abs_exercises = set()
+    cardio_exercises = set()
+
+    for day in to_send_list:
+        group_name = normalize_group_name(day.get('exerciseName', 'Unknown'))
+        for ex in day.get('exerciseList', []):
+            ex_name = ex.get('name', '').strip()
+            ex_gif = ex.get('gif', '').strip()
+            ex_entry = (ex_name, ex_gif)
+
+            if is_abs(ex_name):
+                abs_exercises.add(ex_entry)
+            elif is_cardio(ex_name):
+                cardio_exercises.add(ex_entry)
+            else:
+                grouped_exercises[group_name].add(ex_entry)
+
+    # Convert sets of tuples to sorted list of dicts
+    def format_exercise_set(ex_set):
+        return sorted([{"name": name, "gif": gif} for name, gif in ex_set], key=lambda x: x["name"])
+
+    result = {
+        'unique_exercises': {group: format_exercise_set(exs) for group, exs in grouped_exercises.items()},
+        'abs_exercises': format_exercise_set(abs_exercises),
+        'cardio_exercises': format_exercise_set(cardio_exercises)
+    }
+
+    return result
+	
 def get_week_number(date_str):
 	date = datetime.strptime(date_str, '%b %d, %Y')
 	day = date.day
