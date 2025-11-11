@@ -9,6 +9,8 @@ import hashlib
 import pandas as pd
 import numpy as np
 
+import re
+
 app = Flask(__name__)
 CORS(app)
 
