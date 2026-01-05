@@ -526,7 +526,7 @@ def get_workout_day():
 	print("---- GET WORKOUT DAY ----")
 	date = datetime.today().strftime("%A").lower()
 	print("Date: ", date)
-	workout_name = db.child('dataset').child('schedule').child('profile1').child('week1').child(date).get().val()
+	workout_name = db.child('dataset').child('schedule').child('profile1').child('week2').child(date).get().val()
 	workout_detail = db.child('dataset').child('exercise').child(workout_name['exKey']).get().val()
 	exercise_list = [v for k, v in workout_detail['details'].items()]
 	print(workout_detail['details'])
